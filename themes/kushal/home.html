@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    {% block head %}
+    <meta http-equiv="refresh" content="30">
+    <link rel="stylesheet" href="../vendor/twbs/bootstrap/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="../themes/kushal/assets/sass/hello.css"/>
+    <link rel="icon" type="image/png" href="https://via.placeholder.com/512x512/607D8B/263238/?text=O">
+    <title>{% block title %}{% endblock %} - {{ title }}</title>
+    {% endblock %}
+</head>
+<body>
+<div id="header">
+    <h1 class="text-center">
+        {{ title }}
+    </h1>
+</div>
+<div id="content">
+    {% block content %}{% endblock %}
+</div>
+<div id="footer">
+    {% block footer %}
+    <p class="text text-muted small">
+        &copy; Copyright 2012 by <a href="https://www.bsu.edu/academics/libraries">Ball State University Libraries</a>.
+        Contribute to this project at
+        <a href="https://github.com/Queens-College-Libraries/openroom">
+            Queens College Libraries repository for OpenRoom
+        </a>
+    </p>
+    {% endblock %}
+</div>
+</body>
+</html>

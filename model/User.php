@@ -1,6 +1,20 @@
 <?php
 declare(strict_types=1);
 namespace model;
+
+// MariaDB [openroom]> describe users;
+// +-----------+--------------+------+-----+-------------------+-----------------------------+
+// | Field     | Type         | Null | Key | Default           | Extra                       |
+// +-----------+--------------+------+-----+-------------------+-----------------------------+
+// | username  | varchar(255) | NO   | PRI | NULL              |                             |
+// | password  | varchar(255) | NO   |     | NULL              |                             |
+// | email     | varchar(255) | NO   |     | NULL              |                             |
+// | lastlogin | timestamp    | NO   |     | CURRENT_TIMESTAMP | on update CURRENT_TIMESTAMP |
+// | active    | varchar(255) | NO   |     | 0                 |                             |
+// +-----------+--------------+------+-----+-------------------+-----------------------------+
+// 5 rows in set (0.009 sec)
+
+
 class User
 {
     private $username;
@@ -22,17 +36,22 @@ class User
             $settings[$row['settingname']] = $row['settingvalue'];
         }
         $this->emailaddress = $this->ReturnEmailAddress($this->username, $settings);
-        if ($settings["login_method"] == "ldap") {
+        if(\model\Setting::find("login_method") == "ldap") {
             $this->password = "LDAP";
-        } else {
-            $this->password = "";
-        }
-        if ($settings["login_method"] == "ldap") {
             $this->activationCode = "LDAP";
+            $this->displayname = $this->ReturnDisplayName($this->username, $settings);
         } else {
-            $this->activationCode = "";
+            $db = Db::getInstance();
+            $req = $db->prepare('SELECT username, password, email, lastlogin, active FROM users WHERE username = :username');
+            $req->execute(array('username' => $username));
+            $user = $req->fetch();
+            $this->username = $user['username'];
+            $this->displayname = $user['username'];
+            $this->password = $user['password'];
+            $this->email = $user['email'];
+            $this->lastlogin = $user['lastlogin'];
+            $this->active = $user['active'];
         }
-        $this->displayname = $this->ReturnDisplayName($this->username, $settings);
         if (Administrator::exists($this->username)) {
             $this->isAdministrator = true;
         } else {
@@ -43,32 +62,22 @@ class User
         } else {
             $this->isReporter = false;
         }
-        // if(!User::exists($this->username))
-        // {
-        //     try 
-        //     {
-        //         $db = Db::getInstance();
-        //         echo $this->username . " " . $this->password ." " . $this->emailaddress ." " . $this->activationCode;
-        //         $req = $db->prepare('INSERT INTO `users`(`username`, `password`, `email`, `active`) VALUES (:username, :password, :emailaddress, :activationCode)');
-        //         $req->bindParam(':username', $this->username, \PDO::PARAM_STR, 255);
-        //         $req->bindParam(':password', $this->password, \PDO::PARAM_STR, 255);
-        //         $req->bindParam(':emailaddress', $this->emailaddress, \PDO::PARAM_STR, 255);
-        //         $req->bindParam(':actvationCode', $this->activationCode, \PDO::PARAM_STR, 255);
-        //         $req->execute();
-        //     } catch (PDOException $e) 
-        //     {
-        //         echo 'Database connection has failed. Contact system administrator to resolve this issue!<br>';
-        //         $e->getMessage();
-        //         die();
-        //     }
-        // }
-        // else
-        // {
-        //     $db = Db::getInstance();
-        //     $req = $db->prepare('update `users` set lastlogin = now() where username = :username');
-        //     $req->bindParam(':username', $this->get_username(), \PDO::PARAM_STR, 255);
-        //     $req->execute();
-        // }
+    }
+
+    public static function getPasswordHash(\PDO $db, string $username)
+    {
+        $req = $db->prepare("SELECT password FROM users WHERE username = :username");
+        $req->execute(array('username' => $username));
+        $password = $req->fetch();
+        return $password[0];
+    }
+
+    public static function getIsActive(\pdo $db, string $username): int
+    {
+        $req = $db->prepare("SELECT active FROM users WHERE username = :username");
+        $req->execute(array('username' => $username));
+        $active = $req->fetch();
+        return (int)$active[0];
     }
 
     function ReturnEmailAddress($input_username, $settings)
@@ -78,21 +87,24 @@ class User
 
     function ReturnParameter($input_username, $input_parameter, $settings)
     {
-        $ldapserver = $settings["ldap_baseDN"];
-        $qc_username = $settings["service_username"];
-        $password = $settings["service_password"];
-        $ldap = ldap_connect($ldapserver);
-        if ($bind = ldap_bind($ldap, $qc_username, $password)) {
-            $result = ldap_search($ldap, "", "(CN=$input_username)") or die ("Error in search query: " . ldap_error($ldap));
-            $data = ldap_get_entries($ldap, $result);
-            if (isset($data[0][$input_parameter][0])) {
-                return $data[0][$input_parameter][0];
+        if ($settings["login_method"] == "ldap") {
+            $ldapserver = $settings["ldap_baseDN"];
+            $qc_username = $settings["service_username"];
+            $password = $settings["service_password"];
+            $ldap = ldap_connect($ldapserver);
+            if ($bind = ldap_bind($ldap, $qc_username, $password)) {
+                $result = ldap_search($ldap, "", "(CN=$input_username)") or die ("Error in search query: " . ldap_error($ldap));
+                $data = ldap_get_entries($ldap, $result);
+                if (isset($data[0][$input_parameter][0])) {
+                    return $data[0][$input_parameter][0];
 
-            } else {
-                return "fail";
+                } else {
+                    return "fail";
+                }
             }
+            ldap_close($ldap);
+            return "fail";
         }
-        ldap_close($ldap);
         return "fail";
     }
 
@@ -101,17 +113,12 @@ class User
         return $this->ReturnParameter($input_username, "displayname", $settings);
     }
 
-    public static function get_all_users()
+    public static function getAllUsers(\PDO $db)
     {
-        $list = [];
-        $db = Db::getInstance();
         $req = $db->query('SELECT * FROM `users`');
-
-        // we create a list of Post objects from the database results
         foreach ($req->fetchAll() as $user) {
             $list[] = new User($user['username']);
         }
-
         return $list;
     }
 

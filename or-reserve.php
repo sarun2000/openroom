@@ -140,7 +140,8 @@ if ($username != "") {
                 $ccect->setMySQLTime(date("H:i:s", $current_check_end));
 
                 //Gather its hours for the current time's weekday and special hours
-                eval("\$roomhours = \$thisroom->hours->" . $current_check_wkdy . "->hourset;");
+                // eval("\$roomhours = \$thisroom->hours->" . $current_check_wkdy . "->hourset;");
+                $roomhours = $thisroom->hours->$current_check_wkdy->hourset;
                 $specialroomhours = $thisroom->specialhours->hourset;
 
                 $collision = "";
@@ -366,19 +367,21 @@ if ($username != "") {
                         $id_a = mysqli_fetch_array($id_res);
                         $reservationid = $id_a["reservationid"];
                         //Then insert the optional field values (reservationoptions table)
-                        foreach ($optional_field_values as $key => $ofvalue) {
-                            //Get the option's name
-                            $opt_name_res = mysqli_query($GLOBALS["___mysqli_ston"], "SELECT * FROM optionalfields WHERE optionformname='" . $key . "';");
-                            if ($opt_name_res) {
-                                $opt_name_a = mysqli_fetch_array($opt_name_res);
-                                $opt_name = $opt_name_a["optionname"];
-                                $fixedofvalue = htmlspecialchars($ofvalue, ENT_QUOTES);
-                                $fixedofvalue = str_replace("\\", "", $fixedofvalue);
+                        if (isset($optional_field_values)) {
+                            foreach ($optional_field_values as $key => $ofvalue) {
+                                //Get the option's name
+                                $opt_name_res = mysqli_query($GLOBALS["___mysqli_ston"], "SELECT * FROM optionalfields WHERE optionformname='" . $key . "';");
+                                if ($opt_name_res) {
+                                    $opt_name_a = mysqli_fetch_array($opt_name_res);
+                                    $opt_name = $opt_name_a["optionname"];
+                                    $fixedofvalue = htmlspecialchars($ofvalue, ENT_QUOTES);
+                                    $fixedofvalue = str_replace("\\", "", $fixedofvalue);
 
-                                $opt_res = mysqli_query($GLOBALS["___mysqli_ston"], "INSERT INTO reservationoptions VALUES('" . $opt_name . "','" . $reservationid . "','" . $fixedofvalue . "');");
-                            } else {
-                                //Optional fields not selectable, remove reservation
-                                $errormsg .= "Error in reserving room. Please try again. If you continue to have problems, please contact an administrator.<br/>";
+                                    $opt_res = mysqli_query($GLOBALS["___mysqli_ston"], "INSERT INTO reservationoptions VALUES('" . $opt_name . "','" . $reservationid . "','" . $fixedofvalue . "');");
+                                } else {
+                                    //Optional fields not selectable, remove reservation
+                                    $errormsg .= "Error in reserving room. Please try again. If you continue to have problems, please contact an administrator.<br/>";
+                                }
                             }
                         }
                     } else {
@@ -436,10 +439,18 @@ if ($username != "") {
                         $user_real_gef = "<b>Name</b>: " . $user_real . "<br/><br/>";
                     }
                     if ($settings["login_method"] == "normal") {
-                        $emailrecord = mysqli_query($GLOBALS["___mysqli_ston"], "SELECT * FROM users WHERE username='" . $username . "';");
-                        if ($emailrecord) {
-                            $user_emaila = mysqli_fetch_array($emailrecord);
-                            $user_email = $user_emaila["email"];
+                        // $emailrecord = mysqli_query($GLOBALS["___mysqli_ston"], "SELECT * FROM users WHERE username='" . $username . "';");
+                        // if ($emailrecord) {
+                        //     $user_emaila = mysqli_fetch_array($emailrecord);
+                        //     $user_email = $user_emaila["email"];
+                        // }
+                        if(\model\User::exists($username))
+                        {
+                            $user = \model\User::get_a_specific_user(trim($username));
+                            $user_email = $user->get_emailaddress();
+                            $user_real = $user->get_displayname();
+                            $user_real_str = "Name: " . $user_real . "\n\n";
+                            $user_real_gef = "<b>Name</b>: " . $user_real . "<br/><br/>";
                         }
                     }
 
@@ -452,15 +463,14 @@ if ($username != "") {
                             "E-mail: " . $user_email . "\n\n" .
                             "Room: " . $thisroom->name . "\n\n" .
                             "Date and Time: " . date("F j, Y g:i a", $starttime) . " - " . date("F j, Y g:i a", $endtime) . "\n\n" .
-                            "Number in Group: " . $capacity . "\n\n" .
-                            "Please call (718-997-3900) or email (musiclibrary@qc.cuny.edu) the Music Library if you need further assistance.\n\n";
+                            "Number in Group: " . $capacity . "\n\n";
 
-                        foreach ($optional_field_values as $key => $ofval) {
-                            $opname = mysqli_fetch_array(mysqli_query($GLOBALS["___mysqli_ston"], "SELECT * FROM optionalfields WHERE optionformname='" . $key . "';"));
-                            $opname = $opname["optionname"];
-                            $verbose_msg .= $opname . ": " . str_replace("\\", "", $ofval) . "\n\n";
-                            $gef_msg_of .= "<b>" . $opname . "</b>: " . str_replace("\\", "", $ofval) . "<br/><br/>";
-                        }
+                            foreach ($optional_field_values as $key => $ofval) {
+                                $opname = mysqli_fetch_array(mysqli_query($GLOBALS["___mysqli_ston"], "SELECT * FROM optionalfields WHERE optionformname='" . $key . "';"));
+                                $opname = $opname["optionname"];
+                                $verbose_msg .= $opname . ": " . str_replace("\\", "", $ofval) . "\n\n";
+                                $gef_msg_of .= "<b>" . $opname . "</b>: " . str_replace("\\", "", $ofval) . "<br/><br/>";
+                            }
 
                         $terse_msg = $verbose_msg;
                         $verbose_msg .= $settings["policies"] . "\n\n";
@@ -496,7 +506,7 @@ if ($username != "") {
 
                             } else {
                                 $thecond = $settings["email_condition"];
-                                if ($optional_field_values[$thecond] == $settings["email_condition_value"]) {
+                                if (isset($optional_field_values) && $optional_field_values[$thecond] == $settings["email_condition_value"]) {
                                     mail($email_cond_verbose, $settings["instance_name"] . " Reservation (Condition Met)", $verbose_msg, "From: " . $email_system . "\r\nReturn-Path: " . $email_system . "\r\nReply-To: " . $email_system);
                                     mail($email_cond_terse, $settings["instance_name"] . " Reservation (Condition Met)", $terse_msg, "From: " . $email_system . "\r\nReturn-Path: " . $email_system . "\r\nReply-To: " . $email_system);
                                     mail($email_cond_gef, "Room: " . $thisroom->name, $gef_msg, "MIME-Version: 1.0\r\nContent-type: text/html; charset=iso-8859-1\r\nFrom: " . $email_system . "\r\nReturn-Path: " . $email_system . "\r\nReply-To: " . $email_system);

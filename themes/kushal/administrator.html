@@ -1,0 +1,37 @@
+{% extends "block.html" %}
+
+{% block content %}
+<article>
+    <hgroup>
+        <h2>
+            {{ page_title }}
+        </h2>
+        <h3>
+            Add an administrator
+        </h3>
+    </hgroup>
+    <form name="addAdministrator" action="/admin/administrator.php" method="POST">
+        <div class="form-group">
+            <label for="Administrator">Administrator</label>
+            <input type="text" class="form-control" id="Administrator" aria-describedby="administratorHelp"
+                   placeholder="Enter a username" autofocus="autofocus">
+            <small id="administratorHelp" class="form-text text-muted">
+                Enter a username to give a user administrator privileges.
+                Reminder: All administrators have the same privileges.
+            </small>
+        </div>
+        <button type="submit" class="btn btn-primary">
+            Submit
+        </button>
+    </form>
+    <hr/>
+    <h3>List all administrators</h3>
+    <ul>
+        {% for administrator in administrators %}
+        <li>
+            {{ administrator.username|e }}
+        </li>
+        {% endfor %}
+    </ul>
+</article>
+{% endblock %}

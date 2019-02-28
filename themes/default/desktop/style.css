@@ -213,7 +213,11 @@ p {
 }
 
 #dayviewTable th {
+    border-bottom:1px solid #212121;
+}
 
+#dayviewTable td { 
+    border-bottom:1px solid #212121;
 }
 
 .dayviewTime {

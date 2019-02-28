@@ -1,0 +1,47 @@
+{% extends "block.html" %}
+
+{% block content %}
+
+<article>
+    <h2>
+        {{ page_title }}
+    </h2>
+    <h3>
+        List all current and future reservations
+    </h3>
+
+    {% for reservation1 in reservations %}
+    <h4>
+        {{ reservation1[0].roomName|e }}
+    </h4>
+    <div>
+        <table class="table table-striped">
+            <thead class="thead-dark">
+                <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">start time</th>
+                    <th scope="col">end time</th>
+                </tr>
+            </thead>
+            {% for reservation in reservation1 %}
+
+            <tbody>
+                <tr>
+                    <td>
+                        {{ loop.index }}
+                    </td>
+                    <td>
+                        {{ reservation.startTime|e }}
+                    </td>
+                    <td>
+                        {{ reservation.endTime|e }}
+                    </td>
+                </tr>
+            </tbody>
+
+            {% endfor %}
+        </table>
+    </div>
+    {% endfor %}
+</article>
+{% endblock %}
